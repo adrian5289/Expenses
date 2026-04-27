@@ -244,8 +244,8 @@
                 e('line', { key: 4, x1: 8.6, y1: 13.5, x2: 15.4, y2: 17.5 }),
                 e('line', { key: 5, x1: 15.4, y1: 6.5, x2: 8.6, y2: 10.5 })
             ], s); }
-            function IconCloud(s) { return svgIcon([
-                e('path', { key: 1, d: 'M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z' })
+            function IconChevron(s, up) { return svgIcon([
+                e('polyline', { key: 1, points: up ? '18 15 12 9 6 15' : '6 9 12 15 18 9' })
             ], s); }
 
             function ConfirmModal(props) {
@@ -289,6 +289,7 @@
                 var s12 = useState(''); var toast = s12[0], setToast = s12[1];
                 var s13 = useState(false); var menuOpen = s13[0], setMenuOpen = s13[1];
                 var s14 = useState(true); var loading = s14[0], setLoading = s14[1];
+                var s15 = useState(false); var settledOpen = s15[0], setSettledOpen = s15[1];
 
                 var dateRef = useRef(null);
                 var groupIdRef = useRef(null);
@@ -443,24 +444,40 @@
                     });
                 }, [items, settled]);
 
+                var activeGroups = useMemo(function () {
+                    return groups.filter(function (g) { return !g.isSettled; });
+                }, [groups]);
+
+                var settledGroups = useMemo(function () {
+                    return groups.filter(function (g) { return g.isSettled; });
+                }, [groups]);
+
+                // 重要：summary 包含全部 (settled + active)
                 var summary = useMemo(function () {
-                    var active = groups.filter(function (g) { return !g.isSettled; });
                     var p1 = 0, p2 = 0, net = 0;
-                    active.forEach(function (g) { p1 += g.paid1; p2 += g.paid2; net += g.net; });
+                    groups.forEach(function (g) { p1 += g.paid1; p2 += g.paid2; net += g.net; });
                     var debtor = null, creditor = null, amount = 0;
                     if (net > 0.01) { creditor = USER_1; debtor = USER_2; amount = net; }
                     else if (net < -0.01) { creditor = USER_2; debtor = USER_1; amount = -net; }
                     return { paid1: p1, paid2: p2, total: p1 + p2, amount: amount, debtor: debtor, creditor: creditor };
                 }, [groups]);
 
+                var settledTotal = useMemo(function () {
+                    var t = 0;
+                    settledGroups.forEach(function (g) { t += g.total; });
+                    return t;
+                }, [settledGroups]);
+
                 function buildShareText() {
                     var line = '----------------------------';
                     var txt = '💰 ' + USER_1 + ' & ' + USER_2 + ' 開支記錄\n';
                     txt += '📅 截至 ' + formatDate(todayStr()) + '\n';
                     txt += line + '\n\n';
-                    groups.forEach(function (g) {
-                        txt += '📅 ' + formatDate(g.date) + (g.isSettled ? ' ✓ 已結算' : '') + '\n';
-                        if (!g.isSettled) {
+
+                    if (activeGroups.length > 0) {
+                        txt += '📋 未對數\n\n';
+                        activeGroups.forEach(function (g) {
+                            txt += '📅 ' + formatDate(g.date) + '\n';
                             g.items.forEach(function (it) {
                                 var tag = it.splitType === 'split' ? 'Shared'
                                     : it.splitType === 'forUser1' ? ('For ' + USER_1) : ('For ' + USER_2);
@@ -468,17 +485,26 @@
                                 txt += '  • ' + it.name + ': HK$' + hkdOf(it).toFixed(2) + orig + '\n';
                                 txt += '      ' + it.payer + ' paid · ' + tag + '\n';
                             });
-                        }
-                        txt += '  小計: HK$' + g.total.toFixed(2);
-                        if (Math.abs(g.net) > 0.01) {
-                            var debt = g.net > 0 ? USER_2 : USER_1;
-                            var cred = g.net > 0 ? USER_1 : USER_2;
-                            txt += ' · ' + debt + ' → ' + cred + ' HK$' + Math.abs(g.net).toFixed(2);
-                        }
-                        txt += '\n\n';
-                    });
+                            txt += '  小計: HK$' + g.total.toFixed(2);
+                            if (Math.abs(g.net) > 0.01) {
+                                var debt = g.net > 0 ? USER_2 : USER_1;
+                                var cred = g.net > 0 ? USER_1 : USER_2;
+                                txt += ' · ' + debt + ' → ' + cred + ' HK$' + Math.abs(g.net).toFixed(2);
+                            }
+                            txt += '\n\n';
+                        });
+                    }
+
+                    if (settledGroups.length > 0) {
+                        txt += '✓ 已對數 (' + settledGroups.length + '日)\n';
+                        settledGroups.forEach(function (g) {
+                            txt += '  ' + formatDate(g.date) + ': HK$' + g.total.toFixed(2) + '\n';
+                        });
+                        txt += '  小計: HK$' + settledTotal.toFixed(2) + '\n\n';
+                    }
+
                     txt += line + '\n';
-                    txt += '📊 未結算總額: HK$' + (summary.paid1 + summary.paid2).toFixed(2) + '\n';
+                    txt += '📊 總開支: HK$' + summary.total.toFixed(2) + '\n';
                     txt += '   ' + USER_1 + ' paid: HK$' + summary.paid1.toFixed(2) + '\n';
                     txt += '   ' + USER_2 + ' paid: HK$' + summary.paid2.toFixed(2) + '\n\n';
                     if (summary.amount > 0.01) {
@@ -611,7 +637,7 @@
                                       )
                                     : 'All settled up!'
                             ),
-                            e('p', { className: 'text-[10px] text-brand-muted mt-1.5 font-semibold tracking-wider' }, 'HKD · 未結算項目')
+                            e('p', { className: 'text-[10px] text-brand-muted mt-1.5 font-semibold tracking-wider' }, 'HKD · 全部開支')
                         )
                     ),
 
@@ -755,42 +781,21 @@
                         )
                     ),
 
-                    groups.length > 0 ? e('div', { className: 'space-y-3 mb-4' },
+                    // 未對數
+                    activeGroups.length > 0 ? e('div', { className: 'space-y-3 mb-4' },
                         e('div', { className: 'flex justify-between items-center px-1' },
-                            e('h3', { className: 'font-display text-xl font-semibold' }, 'By Day (' + groups.length + ')'),
+                            e('h3', { className: 'font-display text-xl font-semibold' }, '未對數 (' + activeGroups.length + ')'),
                             e('button', {
                                 onClick: function () {
                                     setConfirmData({
-                                        message: '清除所有記錄同結算？(不能復原)',
+                                        message: '清除所有記錄？(不能復原)',
                                         onConfirm: clearAll
                                     });
                                 },
                                 className: 'text-xs font-semibold text-brand-orange tracking-wider'
                             }, 'CLEAR ALL')
                         ),
-                        groups.map(function (g) {
-                            if (g.isSettled) {
-                                return e('div', { key: g.date, className: 'bg-white rounded-2xl shadow-sm p-4 border-l-4 border-brand-green' },
-                                    e('div', { className: 'flex justify-between items-center' },
-                                        e('div', { className: 'min-w-0' },
-                                            e('p', { className: 'text-[10px] font-semibold tracking-[0.2em] text-brand-green' },
-                                                '✓ SETTLED · ' + formatDate(g.date).toUpperCase()),
-                                            e('p', { className: 'font-display text-3xl font-bold display-num mt-0.5' }, 'HK$' + g.total.toFixed(2)),
-                                            e('p', { className: 'text-xs text-brand-muted mt-0.5 font-medium' },
-                                                g.items.length + ' item' + (g.items.length > 1 ? 's' : '') + ' · 已結算')
-                                        ),
-                                        e('button', {
-                                            onClick: function () {
-                                                setConfirmData({
-                                                    message: '恢復 ' + formatDate(g.date) + ' 嘅詳情？',
-                                                    onConfirm: function () { unsettleDay(g.date); }
-                                                });
-                                            },
-                                            className: 'text-xs font-semibold text-brand-orange tracking-wider px-3 py-2 bg-creamInput rounded-lg'
-                                        }, 'RESET')
-                                    )
-                                );
-                            }
+                        activeGroups.map(function (g) {
                             return e('div', { key: g.date, className: 'bg-white rounded-2xl shadow-sm p-5' },
                                 e('div', { className: 'flex justify-between items-center mb-3' },
                                     e('div', null,
@@ -800,12 +805,12 @@
                                     e('button', {
                                         onClick: function () {
                                             setConfirmData({
-                                                message: '結算 ' + formatDate(g.date) + '？(只會顯示總數)',
+                                                message: '對咗數？(收埋詳情但保留總數)',
                                                 onConfirm: function () { settleDay(g.date); }
                                             });
                                         },
                                         className: 'text-xs font-semibold text-brand-green tracking-wider px-3 py-2 bg-creamInput rounded-lg'
-                                    }, 'SETTLE')
+                                    }, '✓ 對數')
                                 ),
                                 Math.abs(g.net) > 0.01 ? e('p', { className: 'text-xs text-brand-muted mb-3 font-medium' },
                                     e('span', { className: g.net > 0 ? 'text-brand-blue font-semibold' : 'text-brand-orange font-semibold' },
@@ -842,6 +847,48 @@
                                 )
                             );
                         })
+                    ) : null,
+
+                    // 已對數 (collapsible)
+                    settledGroups.length > 0 ? e('div', { className: 'bg-white rounded-2xl shadow-sm border-l-4 border-brand-green overflow-hidden' },
+                        e('button', {
+                            onClick: function () { setSettledOpen(!settledOpen); },
+                            className: 'w-full px-4 py-4 flex justify-between items-center text-left'
+                        },
+                            e('div', null,
+                                e('p', { className: 'text-[10px] font-semibold tracking-[0.2em] text-brand-green' },
+                                    '✓ 已對數 · ' + settledGroups.length + '日'),
+                                e('p', { className: 'font-display text-2xl font-bold display-num mt-0.5' }, 'HK$' + settledTotal.toFixed(2))
+                            ),
+                            e('div', { className: 'text-brand-muted' }, IconChevron(20, settledOpen))
+                        ),
+                        settledOpen ? e('div', { className: 'px-4 pb-4 space-y-2' },
+                            settledGroups.map(function (g) {
+                                return e('div', { key: g.date, className: 'flex justify-between items-center bg-creamInput rounded-xl px-3 py-2.5' },
+                                    e('div', { className: 'min-w-0 flex-1' },
+                                        e('p', { className: 'text-[10px] font-semibold tracking-[0.15em] text-brand-muted' }, formatDate(g.date).toUpperCase()),
+                                        e('p', { className: 'font-display font-bold text-base display-num' }, 'HK$' + g.total.toFixed(2)),
+                                        Math.abs(g.net) > 0.01 ? e('p', { className: 'text-[11px] text-brand-muted font-medium mt-0.5' },
+                                            e('span', { className: g.net > 0 ? 'text-brand-blue font-semibold' : 'text-brand-orange font-semibold' },
+                                                g.net > 0 ? USER_2 : USER_1),
+                                            ' → ',
+                                            e('span', { className: g.net > 0 ? 'text-brand-orange font-semibold' : 'text-brand-blue font-semibold' },
+                                                g.net > 0 ? USER_1 : USER_2),
+                                            ' HK$' + Math.abs(g.net).toFixed(2)
+                                        ) : null
+                                    ),
+                                    e('button', {
+                                        onClick: function () {
+                                            setConfirmData({
+                                                message: '展開 ' + formatDate(g.date) + ' 嘅詳情？',
+                                                onConfirm: function () { unsettleDay(g.date); }
+                                            });
+                                        },
+                                        className: 'text-[10px] font-semibold text-brand-orange tracking-wider px-2 py-1.5 ml-2'
+                                    }, '展開')
+                                );
+                            })
+                        ) : null
                     ) : null
                 );
             }
