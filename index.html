@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#E8623D">
     <link rel="apple-touch-icon" href="IMG_1203.png">
-<link rel="icon" href="IMG_1203.png">
+    <link rel="icon" href="IMG_1203.png">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -187,7 +187,6 @@
                 var url = new URL(window.location.href);
                 var id = url.searchParams.get('id');
                 if (!id) {
-                    // Try localStorage for backward compatibility / persistence
                     id = localStorage.getItem('fat_miles_group_id');
                     if (!id) {
                         id = genId();
@@ -295,7 +294,7 @@
                 var groupIdRef = useRef(null);
                 var loadedRef = useRef(false);
                 var rateSaveTimerRef = useRef(null);
-                var rateLocalEditRef = useRef(0); // timestamp of last local rate edit
+                var rateLocalEditRef = useRef(0);
 
                 useEffect(function () {
                     var lastCur = localStorage.getItem('fat_miles_last_currency');
@@ -307,7 +306,6 @@
 
                     fb.getDoc(ref).then(function (snap) {
                         if (!snap.exists()) {
-                            // Try migrate from localStorage
                             var migrated = { items: [], rates: DEFAULT_RATES, settled: [] };
                             try {
                                 var i = localStorage.getItem('fat_miles_expenses');
@@ -331,7 +329,6 @@
                         if (!snap.exists()) return;
                         var data = snap.data();
                         setItems(data.items || []);
-                        // Don't override rates if user just edited (within 2s)
                         if (Date.now() - rateLocalEditRef.current > 2000) {
                             setRates(Object.assign({}, DEFAULT_RATES, data.rates || {}));
                         }
