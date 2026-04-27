@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Splitter (Fat & Miles)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <style>
+        body { background-color: #F2EBE0; -webkit-font-smoothing: antialiased; font-family: 'DM Sans', system-ui, sans-serif; }
+        .gradient-bar { background: linear-gradient(90deg, #E8623D 0%, #3F6FB5 100%); }
+        .display-num { letter-spacing: -0.02em; }
+        select { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231A2540' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.625rem center; padding-right: 1.75rem; }
+        /* Fix iOS date input alignment */
+        input[type="date"] {
+            font-family: inherit;
+            -webkit-appearance: none;
+            appearance: none;
+            text-align: left;
+            min-height: 1.5em;
+            display: block;
+        }
+        input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+        input[type="date"]::-webkit-datetime-edit { text-align: left; }
+        #err { display:none; padding:16px; margin:16px; background:#fee; border:1px solid #f88; border-radius:8px; font-family:monospace; font-size:12px; white-space:pre-wrap; color:#900; }
+    </style>
+</head>
+<body class="min-h-screen p-4 text-[#1A2540]">
+    <div id="root"></div>
+    <div id="err"></div>
+
+    <script>
+    (function () {
+        function showErr(msg) {
+            var el = document.getElementById('err');
+            if (!el) return;
+            el.style.display = 'block';
+            el.textContent = (el.textContent ? el.textContent + '\n\n' : '') + msg;
+        }
+
+        window.addEventListener('error', function (ev) {
+            showErr('JS Error: ' + (ev.message || 'unknown') +
+                    '\nFile: ' + (ev.filename || '?') +
+                    '\nLine: ' + (ev.lineno || '?') + ':' + (ev.colno || '?') +
+                    (ev.error && ev.error.stack ? '\n\nStack:\n' + ev.error.stack : ''));
+        });
+
+        function start() {
+            if (typeof React === 'undefined') { showErr('React 載入失敗'); return; }
+            if (typeof ReactDOM === 'undefined') { showErr('ReactDOM 載入失敗'); return; }
+
+            if (window.tailwind && window.tailwind.config) {
+                window.tailwind.config = {
+                    theme: {
+                        extend: {
+                            colors: {
+                                cream: '#F2EBE0',
+                                creamInput: '#EFE8DC',
+                                brand: {
+                                    orange: '#E8623D',
+                                    blue: '#3F6FB5',
+                                    green: '#2EAE5C',
+                                    ink: '#1A2540',
+                                    muted: '#9AA0A6'
+                                }
+                            },
+                            fontFamily: {
+                                sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
+                                display: ['"DM Sans"', 'system-ui', 'sans-serif']
+                            }
+                        }
+                    }
+                };
+            }
+
+            try { run(); } catch (er) {
+                showErr('Run error: ' + (er && er.message) + '\n\n' + (er && er.stack));
+            }
+        }
+
+        function run() {
+            var e = React.createElement;
+            var useState = React.useState;
+            var useEffect = React.useEffect;
+            var useMemo = React.useMemo;
+            var useRef = React.useRef;
+
+            var USER_1 = 'Fat';
+            var USER_2 = 'Miles';
+
+            var DEFAULT_RATES = {
+                HKD: 1, USD: 7.80, EUR: 8.50, JPY: 0.052, GBP: 9.90, CNY: 1.08,
+                TWD: 0.24, KRW: 0.0058, SGD: 5.80, AUD: 5.10, CAD: 5.70, THB: 0.22
+            };
+            var CURRENCY_ORDER = ['HKD','USD','EUR','JPY','GBP','CNY','TWD','KRW','SGD','AUD','CAD','THB'];
+
+            function todayStr() {
+                var d = new Date();
+                var off = d.getTimezoneOffset();
+                return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
+            }
+
+            function formatDate(d) {
+                try {
+                    var dt = new Date(d + 'T00:00:00');
+                    return dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                } catch (er) { return d; }
+            }
+
+            function svgIcon(paths, size) {
+                var props = {
+                    xmlns: 'http://www.w3.org/2000/svg',
+                    width: size || 20, height: size || 20,
+                    viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+                    strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round'
+                };
+                return e.apply(null, ['svg', props].concat(paths));
+            }
+            function IconTrash(s) {
+                return svgIcon([
+                    e('polyline', { key: 1, points: '3 6 5 6 21 6' }),
+                    e('path', { key: 2, d: 'M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6' }),
+                    e('path', { key: 3, d: 'M10 11v6' }),
+                    e('path', { key: 4, d: 'M14 11v6' }),
+                    e('path', { key: 5, d: 'M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2' })
+                ], s);
+            }
+            function IconCopy(s) {
+                return svgIcon([
+                    e('rect', { key: 1, x: 9, y: 9, width: 13, height: 13, rx: 2 }),
+                    e('path', { key: 2, d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' })
+                ], s);
+            }
+            function IconCheck(s) {
+                return svgIcon([e('polyline', { key: 1, points: '20 6 9 17 4 12' })], s);
+            }
+            function IconRates(s) {
+                return svgIcon([
+                    e('path', { key: 1, d: 'M3 6h18' }),
+                    e('path', { key: 2, d: 'M3 12h18' }),
+                    e('path', { key: 3, d: 'M3 18h18' })
+                ], s);
+            }
+            function IconDots(s) {
+                return svgIcon([
+                    e('circle', { key: 1, cx: 12, cy: 5, r: 1.5 }),
+                    e('circle', { key: 2, cx: 12, cy: 12, r: 1.5 }),
+                    e('circle', { key: 3, cx: 12, cy: 19, r: 1.5 })
+                ], s);
+            }
+            function IconCalendar(s) {
+                return svgIcon([
+                    e('rect', { key: 1, x: 3, y: 4, width: 18, height: 18, rx: 2 }),
+                    e('line', { key: 2, x1: 16, y1: 2, x2: 16, y2: 6 }),
+                    e('line', { key: 3, x1: 8, y1: 2, x2: 8, y2: 6 }),
+                    e('line', { key: 4, x1: 3, y1: 10, x2: 21, y2: 10 })
+                ], s);
+            }
+
+            function ConfirmModal(props) {
+                var data = props.data;
+                if (!data) return null;
+                return e('div', { className: 'fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4' },
+                    e('div', { className: 'bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl' },
+                        e('p', { className: 'text-brand-ink mb-5 font-semibold' }, data.message),
+                        e('div', { className: 'flex gap-3 justify-end' },
+                            e('button', { onClick: props.onClose, className: 'px-4 py-2 rounded-xl bg-creamInput text-brand-ink font-semibold' }, '取消'),
+                            e('button', {
+                                onClick: function () { data.onConfirm(); props.onClose(); },
+                                className: 'px-4 py-2 rounded-xl bg-brand-orange text-white font-semibold'
+                            }, '確定')
+                        )
+                    )
+                );
+            }
+
+            function Toast(props) {
+                if (!props.msg) return null;
+                return e('div', { className: 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-brand-ink text-white px-5 py-3 rounded-full shadow-lg z-50 font-semibold text-sm flex items-center gap-2' },
+                    IconCheck(16), props.msg
+                );
+            }
+
+            function App() {
+                var s = useState([]); var items = s[0], setItems = s[1];
+                var s2 = useState(DEFAULT_RATES); var rates = s2[0], setRates = s2[1];
+                var s3 = useState([]); var settled = s3[0], setSettled = s3[1];
+
+                var s4 = useState(''); var itemName = s4[0], setItemName = s4[1];
+                var s5 = useState(''); var price = s5[0], setPrice = s5[1];
+                var s6 = useState('HKD'); var currency = s6[0], setCurrency = s6[1];
+                var s7 = useState(USER_1); var payer = s7[0], setPayer = s7[1];
+                var s8 = useState('split'); var splitType = s8[0], setSplitType = s8[1];
+                var s9 = useState(todayStr()); var date = s9[0], setDate = s9[1];
+
+                var s10 = useState(false); var showRates = s10[0], setShowRates = s10[1];
+                var s11 = useState(null); var confirmData = s11[0], setConfirmData = s11[1];
+                var s12 = useState(''); var toast = s12[0], setToast = s12[1];
+                var s13 = useState(false); var menuOpen = s13[0], setMenuOpen = s13[1];
+
+                var dateRef = useRef(null);
+
+                useEffect(function () {
+                    try {
+                        var i = localStorage.getItem('fat_miles_expenses');
+                        if (i) {
+                            var parsed = JSON.parse(i).map(function (it) {
+                                return Object.assign({ currency: 'HKD', rate: 1, date: todayStr() }, it);
+                            });
+                            setItems(parsed);
+                        }
+                        var r = localStorage.getItem('fat_miles_rates');
+                        if (r) setRates(Object.assign({}, DEFAULT_RATES, JSON.parse(r)));
+                        var st = localStorage.getItem('fat_miles_settled');
+                        if (st) setSettled(JSON.parse(st));
+                        var lastCur = localStorage.getItem('fat_miles_last_currency');
+                        if (lastCur && CURRENCY_ORDER.indexOf(lastCur) !== -1) setCurrency(lastCur);
+                    } catch (er) {}
+                }, []);
+
+                useEffect(function () { try { localStorage.setItem('fat_miles_expenses', JSON.stringify(items)); } catch (er) {} }, [items]);
+                useEffect(function () { try { localStorage.setItem('fat_miles_rates', JSON.stringify(rates)); } catch (er) {} }, [rates]);
+                useEffect(function () { try { localStorage.setItem('fat_miles_settled', JSON.stringify(settled)); } catch (er) {} }, [settled]);
+                useEffect(function () { try { localStorage.setItem('fat_miles_last_currency', currency); } catch (er) {} }, [currency]);
+
+                function showToast(msg) {
+                    setToast(msg);
+                    setTimeout(function () { setToast(''); }, 2200);
+                }
+
+                function addItem(ev) {
+                    ev.preventDefault();
+                    if (!itemName || !price || parseFloat(price) <= 0) return;
+                    var rate = rates[currency] || 1;
+                    var newItem = {
+                        id: Date.now(), name: itemName, price: parseFloat(price),
+                        currency: currency, rate: rate, payer: payer, splitType: splitType, date: date
+                    };
+                    setItems(items.concat([newItem]));
+                    setItemName(''); setPrice('');
+                }
+
+                function deleteItem(id) {
+                    setItems(items.filter(function (i) { return i.id !== id; }));
+                }
+
+                function hkdOf(item) { return item.price * (item.rate || 1); }
+
+                var groups = useMemo(function () {
+                    var map = {};
+                    items.forEach(function (it) {
+                        if (!map[it.date]) map[it.date] = [];
+                        map[it.date].push(it);
+                    });
+                    return Object.keys(map).sort(function (a, b) { return b.localeCompare(a); }).map(function (d) {
+                        var list = map[d];
+                        var p1 = 0, p2 = 0, sh1 = 0, sh2 = 0;
+                        list.forEach(function (it) {
+                            var h = hkdOf(it);
+                            if (it.payer === USER_1) p1 += h; else p2 += h;
+                            if (it.splitType === 'split') { sh1 += h / 2; sh2 += h / 2; }
+                            else if (it.splitType === 'forUser1') sh1 += h;
+                            else sh2 += h;
+                        });
+                        return {
+                            date: d, items: list,
+                            paid1: p1, paid2: p2, share1: sh1, share2: sh2,
+                            total: p1 + p2, net: p1 - sh1,
+                            isSettled: settled.indexOf(d) !== -1
+                        };
+                    });
+                }, [items, settled]);
+
+                var summary = useMemo(function () {
+                    var active = groups.filter(function (g) { return !g.isSettled; });
+                    var p1 = 0, p2 = 0, net = 0;
+                    active.forEach(function (g) { p1 += g.paid1; p2 += g.paid2; net += g.net; });
+                    var debtor = null, creditor = null, amount = 0;
+                    if (net > 0.01) { creditor = USER_1; debtor = USER_2; amount = net; }
+                    else if (net < -0.01) { creditor = USER_2; debtor = USER_1; amount = -net; }
+                    return { paid1: p1, paid2: p2, total: p1 + p2, amount: amount, debtor: debtor, creditor: creditor };
+                }, [groups]);
+
+                function settleDay(d) { setSettled(settled.concat([d])); }
+                function unsettleDay(d) { setSettled(settled.filter(function (x) { return x !== d; })); }
+
+                function buildShareText() {
+                    var line = '----------------------------';
+                    var txt = '💰 ' + USER_1 + ' & ' + USER_2 + ' 開支記錄\n';
+                    txt += '📅 截至 ' + formatDate(todayStr()) + '\n';
+                    txt += line + '\n\n';
+                    groups.forEach(function (g) {
+                        txt += '📅 ' + formatDate(g.date) + (g.isSettled ? ' ✓ 已結算' : '') + '\n';
+                        if (!g.isSettled) {
+                            g.items.forEach(function (it) {
+                                var tag = it.splitType === 'split' ? 'Shared'
+                                    : it.splitType === 'forUser1' ? ('For ' + USER_1) : ('For ' + USER_2);
+                                var orig = it.currency !== 'HKD' ? (' [' + it.currency + ' ' + it.price.toFixed(2) + ']') : '';
+                                txt += '  • ' + it.name + ': HK$' + hkdOf(it).toFixed(2) + orig + '\n';
+                                txt += '      ' + it.payer + ' paid · ' + tag + '\n';
+                            });
+                        }
+                        txt += '  小計: HK$' + g.total.toFixed(2);
+                        if (Math.abs(g.net) > 0.01) {
+                            var debt = g.net > 0 ? USER_2 : USER_1;
+                            var cred = g.net > 0 ? USER_1 : USER_2;
+                            txt += ' · ' + debt + ' → ' + cred + ' HK$' + Math.abs(g.net).toFixed(2);
+                        }
+                        txt += '\n\n';
+                    });
+                    txt += line + '\n';
+                    txt += '📊 未結算總額: HK$' + (summary.paid1 + summary.paid2).toFixed(2) + '\n';
+                    txt += '   ' + USER_1 + ' paid: HK$' + summary.paid1.toFixed(2) + '\n';
+                    txt += '   ' + USER_2 + ' paid: HK$' + summary.paid2.toFixed(2) + '\n\n';
+                    if (summary.amount > 0.01) {
+                        txt += '💸 ' + summary.debtor + ' 要俾 ' + summary.creditor + ': HK$' + summary.amount.toFixed(2);
+                    } else {
+                        txt += '✅ 已平數！';
+                    }
+                    return txt;
+                }
+
+                function copyShare() {
+                    var txt = buildShareText();
+                    function fallback() {
+                        var ta = document.createElement('textarea');
+                        ta.value = txt;
+                        ta.style.position = 'fixed';
+                        ta.style.top = '0';
+                        ta.style.left = '0';
+                        ta.style.opacity = '0';
+                        document.body.appendChild(ta);
+                        ta.focus();
+                        ta.select();
+                        ta.setSelectionRange(0, 99999);
+                        try { document.execCommand('copy'); showToast('已複製！'); }
+                        catch (er) { showToast('複製失敗'); }
+                        document.body.removeChild(ta);
+                    }
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(txt).then(
+                            function () { showToast('已複製！'); },
+                            function () { fallback(); }
+                        );
+                    } else {
+                        fallback();
+                    }
+                }
+
+                function updateRate(cur, val) {
+                    var newRates = Object.assign({}, rates);
+                    newRates[cur] = parseFloat(val) || 0;
+                    setRates(newRates);
+                }
+
+                function pillBtn(active, color) {
+                    if (!active) return 'bg-creamInput text-brand-ink border border-transparent';
+                    if (color === 'orange') return 'bg-white text-brand-orange border-2 border-brand-orange shadow-sm';
+                    if (color === 'blue') return 'bg-white text-brand-blue border-2 border-brand-blue shadow-sm';
+                    return 'bg-white text-brand-ink border-2 border-brand-ink shadow-sm';
+                }
+
+                var livePreview = (price && currency !== 'HKD')
+                    ? (parseFloat(price) * (rates[currency] || 0)).toFixed(2) : null;
+
+                function openDatePicker() {
+                    var el = dateRef.current;
+                    if (!el) return;
+                    if (typeof el.showPicker === 'function') {
+                        try { el.showPicker(); return; } catch (er) {}
+                    }
+                    el.focus();
+                    el.click();
+                }
+
+                return e('div', { className: 'max-w-md mx-auto pb-16 relative' },
+                    e(ConfirmModal, { data: confirmData, onClose: function () { setConfirmData(null); } }),
+                    e(Toast, { msg: toast }),
+
+                    // Header with menu button
+                    e('div', { className: 'flex items-center justify-between pt-4 pb-2 px-1' },
+                        e('div', { className: 'w-10' }), // spacer
+                        e('div', { className: 'text-center flex-1' },
+                            e('p', { className: 'text-[11px] font-semibold tracking-[0.25em] text-brand-muted' }, 'EXPENSE SPLITTER'),
+                            e('h1', { className: 'font-display text-3xl font-bold mt-0.5' },
+                                e('span', { className: 'text-brand-orange' }, USER_1),
+                                e('span', { className: 'text-brand-muted font-medium' }, ' & '),
+                                e('span', { className: 'text-brand-blue' }, USER_2)
+                            )
+                        ),
+                        // Menu button + dropdown
+                        e('div', { className: 'relative w-10 flex justify-end' },
+                            e('button', {
+                                onClick: function () { setMenuOpen(!menuOpen); },
+                                className: 'w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-brand-ink'
+                            }, IconDots(20)),
+                            menuOpen ? e('div', { className: 'fixed inset-0 z-30', onClick: function () { setMenuOpen(false); } }) : null,
+                            menuOpen ? e('div', { className: 'absolute right-0 top-12 z-40 bg-white rounded-2xl shadow-xl py-1.5 min-w-[180px] border border-black border-opacity-5' },
+                                e('button', {
+                                    onClick: function () { setMenuOpen(false); copyShare(); },
+                                    className: 'w-full px-4 py-3 flex items-center gap-3 hover:bg-creamInput text-left font-semibold text-brand-ink'
+                                }, IconCopy(18), 'Copy Share'),
+                                e('div', { className: 'h-px bg-creamInput mx-2' }),
+                                e('button', {
+                                    onClick: function () { setMenuOpen(false); setShowRates(!showRates); },
+                                    className: 'w-full px-4 py-3 flex items-center gap-3 hover:bg-creamInput text-left font-semibold text-brand-ink'
+                                }, IconRates(18), '匯率設定')
+                            ) : null
+                        )
+                    ),
+
+                    e('div', { className: 'pb-4' }),
+
+                    e('div', { className: 'bg-white rounded-2xl shadow-sm overflow-hidden mb-4' },
+                        e('div', { className: 'h-1.5 gradient-bar' }),
+                        e('div', { className: 'px-6 py-7 text-center' },
+                            e('p', { className: 'text-[11px] font-semibold tracking-[0.25em] text-brand-muted mb-2' }, 'OUTSTANDING'),
+                            e('div', { className: 'font-display text-6xl font-bold text-brand-green display-num' },
+                                '$' + summary.amount.toFixed(2)
+                            ),
+                            e('p', { className: 'text-brand-ink mt-2 text-sm font-medium' },
+                                summary.amount > 0
+                                    ? e('span', null,
+                                        e('span', { className: 'text-brand-orange font-semibold' }, summary.debtor),
+                                        ' owes ',
+                                        e('span', { className: 'text-brand-blue font-semibold' }, summary.creditor)
+                                      )
+                                    : 'All settled up!'
+                            ),
+                            e('p', { className: 'text-[10px] text-brand-muted mt-1.5 font-semibold tracking-wider' }, 'HKD · 未結算項目')
+                        )
+                    ),
+
+                    e('div', { className: 'grid grid-cols-2 gap-3 mb-4' },
+                        e('div', { className: 'bg-white rounded-2xl shadow-sm pl-4 pr-3 py-4 border-l-4 border-brand-orange' },
+                            e('p', { className: 'text-[10px] font-semibold tracking-[0.2em] text-brand-muted' }, USER_1.toUpperCase() + ' PAID'),
+                            e('p', { className: 'font-display text-2xl font-bold text-brand-orange mt-1 display-num' }, '$' + summary.paid1.toFixed(2))
+                        ),
+                        e('div', { className: 'bg-white rounded-2xl shadow-sm pl-4 pr-3 py-4 border-l-4 border-brand-blue' },
+                            e('p', { className: 'text-[10px] font-semibold tracking-[0.2em] text-brand-muted' }, USER_2.toUpperCase() + ' PAID'),
+                            e('p', { className: 'font-display text-2xl font-bold text-brand-blue mt-1 display-num' }, '$' + summary.paid2.toFixed(2))
+                        )
+                    ),
+
+                    // Rates panel (when toggled)
+                    showRates ? e('div', { className: 'bg-white rounded-2xl shadow-sm p-5 mb-4' },
+                        e('div', { className: 'flex justify-between items-center mb-3' },
+                            e('h3', { className: 'font-display text-lg font-semibold' }, '匯率 (1 unit → HKD)'),
+                            e('div', { className: 'flex gap-3 items-center' },
+                                e('button', {
+                                    onClick: function () { setRates(DEFAULT_RATES); },
+                                    className: 'text-xs font-semibold text-brand-orange tracking-wider'
+                                }, 'RESET'),
+                                e('button', {
+                                    onClick: function () { setShowRates(false); },
+                                    className: 'text-xs font-semibold text-brand-muted tracking-wider'
+                                }, '✕')
+                            )
+                        ),
+                        e('div', { className: 'grid grid-cols-2 gap-2' },
+                            CURRENCY_ORDER.filter(function (c) { return c !== 'HKD'; }).map(function (c) {
+                                return e('div', { key: c, className: 'flex items-center bg-creamInput rounded-xl px-3 py-2' },
+                                    e('span', { className: 'font-semibold text-sm w-12' }, c),
+                                    e('input', {
+                                        type: 'number', value: rates[c], step: '0.0001',
+                                        onChange: function (ev) { updateRate(c, ev.target.value); },
+                                        className: 'flex-1 min-w-0 bg-transparent outline-none font-semibold text-right'
+                                    })
+                                );
+                            })
+                        )
+                    ) : null,
+
+                    e('div', { className: 'bg-white rounded-2xl shadow-sm p-5 mb-4' },
+                        e('h2', { className: 'font-display text-xl font-semibold mb-4' }, 'Add Expense'),
+                        e('form', { onSubmit: addItem, className: 'space-y-4' },
+                            e('div', null,
+                                e('label', { className: 'block text-[10px] font-semibold tracking-[0.2em] text-brand-muted mb-1.5' }, 'ITEM'),
+                                e('input', {
+                                    type: 'text', value: itemName,
+                                    onChange: function (ev) { setItemName(ev.target.value); },
+                                    placeholder: 'e.g. Dinner, Groceries...',
+                                    className: 'w-full px-4 py-3 rounded-xl bg-creamInput border-0 outline-none focus:ring-2 focus:ring-brand-orange placeholder-gray-400 font-medium'
+                                })
+                            ),
+                            e('div', null,
+                                e('div', { className: 'flex justify-between items-center mb-1.5' },
+                                    e('label', { className: 'text-[10px] font-semibold tracking-[0.2em] text-brand-muted' }, 'AMOUNT'),
+                                    currency !== 'HKD' ? e('button', {
+                                        type: 'button',
+                                        onClick: function () { setCurrency('HKD'); },
+                                        className: 'text-[10px] font-semibold tracking-wider text-brand-orange'
+                                    }, '↺ RESET TO HKD') : null
+                                ),
+                                e('div', { className: 'flex gap-2' },
+                                    e('select', {
+                                        value: currency,
+                                        onChange: function (ev) { setCurrency(ev.target.value); },
+                                        className: 'w-24 flex-shrink-0 px-3 py-3 rounded-xl bg-creamInput border-0 outline-none focus:ring-2 focus:ring-brand-orange font-semibold text-sm'
+                                    }, CURRENCY_ORDER.map(function (c) { return e('option', { key: c, value: c }, c); })),
+                                    e('input', {
+                                        type: 'number', value: price,
+                                        onChange: function (ev) { setPrice(ev.target.value); },
+                                        placeholder: '0.00', step: '0.01',
+                                        className: 'flex-1 min-w-0 px-4 py-3 rounded-xl bg-creamInput border-0 outline-none focus:ring-2 focus:ring-brand-orange placeholder-gray-400 font-display text-lg font-semibold'
+                                    })
+                                ),
+                                livePreview ? e('p', { className: 'text-xs text-brand-muted mt-1.5 font-medium' },
+                                    '≈ ', e('span', { className: 'text-brand-ink font-semibold' }, 'HK$' + livePreview),
+                                    ' @ rate ' + rates[currency]
+                                ) : null
+                            ),
+                            // DATE — custom display + native picker
+                            e('div', null,
+                                e('label', { className: 'block text-[10px] font-semibold tracking-[0.2em] text-brand-muted mb-1.5' }, 'DATE'),
+                                e('div', { className: 'relative' },
+                                    e('button', {
+                                        type: 'button',
+                                        onClick: openDatePicker,
+                                        className: 'w-full px-4 py-3 rounded-xl bg-creamInput border-0 outline-none flex items-center justify-between font-semibold text-left'
+                                    },
+                                        e('span', null, formatDate(date) + ' · ' + (new Date(date + 'T00:00:00')).getFullYear()),
+                                        IconCalendar(18)
+                                    ),
+                                    e('input', {
+                                        ref: dateRef,
+                                        type: 'date', value: date,
+                                        onChange: function (ev) { setDate(ev.target.value); },
+                                        style: { position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', pointerEvents: 'none' },
+                                        tabIndex: -1, 'aria-hidden': 'true'
+                                    })
+                                )
+                            ),
+                            e('div', null,
+                                e('label', { className: 'block text-[10px] font-semibold tracking-[0.2em] text-brand-muted mb-1.5' }, 'PAID BY'),
+                                e('div', { className: 'grid grid-cols-2 gap-2' },
+                                    e('button', {
+                                        type: 'button',
+                                        onClick: function () { setPayer(USER_1); },
+                                        className: 'py-3 rounded-xl font-semibold transition ' + pillBtn(payer === USER_1, 'orange')
+                                    }, USER_1),
+                                    e('button', {
+                                        type: 'button',
+                                        onClick: function () { setPayer(USER_2); },
+                                        className: 'py-3 rounded-xl font-semibold transition ' + pillBtn(payer === USER_2, 'blue')
+                                    }, USER_2)
+                                )
+                            ),
+                            e('div', null,
+                                e('label', { className: 'block text-[10px] font-semibold tracking-[0.2em] text-brand-muted mb-1.5' }, 'SPLIT'),
+                                e('div', { className: 'grid grid-cols-3 gap-2' },
+                                    e('button', {
+                                        type: 'button',
+                                        onClick: function () { setSplitType('split'); },
+                                        className: 'py-3 rounded-xl font-semibold text-sm transition ' + pillBtn(splitType === 'split', 'ink')
+                                    }, 'Shared'),
+                                    e('button', {
+                                        type: 'button',
+                                        onClick: function () { setSplitType('forUser1'); },
+                                        className: 'py-3 rounded-xl font-semibold text-sm transition ' + pillBtn(splitType === 'forUser1', 'orange')
+                                    }, USER_1),
+                                    e('button', {
+                                        type: 'button',
+                                        onClick: function () { setSplitType('forUser2'); },
+                                        className: 'py-3 rounded-xl font-semibold text-sm transition ' + pillBtn(splitType === 'forUser2', 'blue')
+                                    }, USER_2)
+                                )
+                            ),
+                            e('button', {
+                                type: 'submit',
+                                className: 'w-full bg-brand-orange text-white py-4 rounded-xl font-display font-semibold text-lg shadow-md mt-2'
+                            }, 'Add Expense')
+                        )
+                    ),
+
+                    groups.length > 0 ? e('div', { className: 'space-y-3 mb-4' },
+                        e('div', { className: 'flex justify-between items-center px-1' },
+                            e('h3', { className: 'font-display text-xl font-semibold' }, 'By Day (' + groups.length + ')'),
+                            e('button', {
+                                onClick: function () {
+                                    setConfirmData({
+                                        message: '清除所有記錄同結算？(不能復原)',
+                                        onConfirm: function () { setItems([]); setSettled([]); }
+                                    });
+                                },
+                                className: 'text-xs font-semibold text-brand-orange tracking-wider'
+                            }, 'CLEAR ALL')
+                        ),
+                        groups.map(function (g) {
+                            if (g.isSettled) {
+                                return e('div', { key: g.date, className: 'bg-white rounded-2xl shadow-sm p-4 border-l-4 border-brand-green' },
+                                    e('div', { className: 'flex justify-between items-center' },
+                                        e('div', { className: 'min-w-0' },
+                                            e('p', { className: 'text-[10px] font-semibold tracking-[0.2em] text-brand-green' },
+                                                '✓ SETTLED · ' + formatDate(g.date).toUpperCase()),
+                                            e('p', { className: 'font-display text-3xl font-bold display-num mt-0.5' }, 'HK$' + g.total.toFixed(2)),
+                                            e('p', { className: 'text-xs text-brand-muted mt-0.5 font-medium' },
+                                                g.items.length + ' item' + (g.items.length > 1 ? 's' : '') + ' · 已結算')
+                                        ),
+                                        e('button', {
+                                            onClick: function () {
+                                                setConfirmData({
+                                                    message: '恢復 ' + formatDate(g.date) + ' 嘅詳情？',
+                                                    onConfirm: function () { unsettleDay(g.date); }
+                                                });
+                                            },
+                                            className: 'text-xs font-semibold text-brand-orange tracking-wider px-3 py-2 bg-creamInput rounded-lg'
+                                        }, 'RESET')
+                                    )
+                                );
+                            }
+                            return e('div', { key: g.date, className: 'bg-white rounded-2xl shadow-sm p-5' },
+                                e('div', { className: 'flex justify-between items-center mb-3' },
+                                    e('div', null,
+                                        e('p', { className: 'text-[10px] font-semibold tracking-[0.2em] text-brand-muted' }, formatDate(g.date).toUpperCase()),
+                                        e('p', { className: 'font-display text-xl font-bold display-num' }, 'HK$' + g.total.toFixed(2))
+                                    ),
+                                    e('button', {
+                                        onClick: function () {
+                                            setConfirmData({
+                                                message: '結算 ' + formatDate(g.date) + '？(只會顯示總數)',
+                                                onConfirm: function () { settleDay(g.date); }
+                                            });
+                                        },
+                                        className: 'text-xs font-semibold text-brand-green tracking-wider px-3 py-2 bg-creamInput rounded-lg'
+                                    }, 'SETTLE')
+                                ),
+                                Math.abs(g.net) > 0.01 ? e('p', { className: 'text-xs text-brand-muted mb-3 font-medium' },
+                                    e('span', { className: g.net > 0 ? 'text-brand-blue font-semibold' : 'text-brand-orange font-semibold' },
+                                        g.net > 0 ? USER_2 : USER_1),
+                                    ' → ',
+                                    e('span', { className: g.net > 0 ? 'text-brand-orange font-semibold' : 'text-brand-blue font-semibold' },
+                                        g.net > 0 ? USER_1 : USER_2),
+                                    ' HK$' + Math.abs(g.net).toFixed(2)
+                                ) : null,
+                                e('div', { className: 'space-y-2' },
+                                    g.items.map(function (it) {
+                                        var payerColor = it.payer === USER_1 ? 'text-brand-orange' : 'text-brand-blue';
+                                        var tagText = it.splitType === 'split' ? 'Shared'
+                                            : it.splitType === 'forUser1' ? ('For ' + USER_1) : ('For ' + USER_2);
+                                        return e('div', { key: it.id, className: 'flex justify-between items-center bg-creamInput rounded-xl px-4 py-3' },
+                                            e('div', { className: 'min-w-0 flex-1' },
+                                                e('div', { className: 'font-semibold truncate' }, it.name),
+                                                e('div', { className: 'text-xs text-brand-muted mt-0.5 font-medium' },
+                                                    e('span', { className: payerColor + ' font-semibold' }, it.payer),
+                                                    ' paid · ' + tagText,
+                                                    it.currency !== 'HKD' ? e('span', { className: 'ml-1' },
+                                                        ' · ' + it.currency + ' ' + it.price.toFixed(2)) : null
+                                                )
+                                            ),
+                                            e('div', { className: 'flex items-center gap-3 ml-2' },
+                                                e('span', { className: 'font-display font-semibold text-lg display-num' }, '$' + hkdOf(it).toFixed(2)),
+                                                e('button', {
+                                                    onClick: function () { deleteItem(it.id); },
+                                                    className: 'text-brand-muted hover:text-brand-orange transition p-1'
+                                                }, IconTrash(18))
+                                            )
+                                        );
+                                    })
+                                )
+                            );
+                        })
+                    ) : null
+                );
+            }
+
+            var root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(e(App));
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', start);
+        } else {
+            start();
+        }
+    })();
+    </script>
+</body>
+</html>
