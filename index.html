@@ -8,10 +8,19 @@
     <!-- iOS Web App -->
     <meta name="apple-mobile-web-app-title" content="夾錢">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#E8623D">
+
+    <!-- Favicon / Home Screen Icons -->
+    <link rel="icon" type="image/png" href="IMG_1203.png">
+    <link rel="shortcut icon" type="image/png" href="IMG_1203.png">
     <link rel="apple-touch-icon" href="IMG_1203.png">
-    <link rel="icon" href="IMG_1203.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="IMG_1203.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="IMG_1203.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="IMG_1203.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="IMG_1203.png">
+    <link rel="apple-touch-icon-precomposed" href="IMG_1203.png">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -452,7 +461,6 @@
                     return groups.filter(function (g) { return g.isSettled; });
                 }, [groups]);
 
-                // 重要：summary 包含全部 (settled + active)
                 var summary = useMemo(function () {
                     var p1 = 0, p2 = 0, net = 0;
                     groups.forEach(function (g) { p1 += g.paid1; p2 += g.paid2; net += g.net; });
@@ -781,7 +789,6 @@
                         )
                     ),
 
-                    // 未對數
                     activeGroups.length > 0 ? e('div', { className: 'space-y-3 mb-4' },
                         e('div', { className: 'flex justify-between items-center px-1' },
                             e('h3', { className: 'font-display text-xl font-semibold' }, '未對數 (' + activeGroups.length + ')'),
@@ -849,7 +856,6 @@
                         })
                     ) : null,
 
-                    // 已對數 (collapsible)
                     settledGroups.length > 0 ? e('div', { className: 'bg-white rounded-2xl shadow-sm border-l-4 border-brand-green overflow-hidden' },
                         e('button', {
                             onClick: function () { setSettledOpen(!settledOpen); },
