@@ -6,13 +6,12 @@
     <title>Expense Splitter (Fat & Miles)</title>
 
     <!-- iOS Web App -->
-    <meta name="apple-mobile-web-app-title" content="💰">
+    <meta name="apple-mobile-web-app-title" content="夾錢">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#FFFFFF">
 
-    <!-- Apple Touch Icon (Add to Home Screen) - PNG -->
     <link rel="apple-touch-icon" href="Photo.PNG">
     <link rel="apple-touch-icon" sizes="180x180" href="Photo.PNG">
     <link rel="icon" type="image/png" href="Photo.PNG">
@@ -28,25 +27,12 @@
         .gradient-bar { background: linear-gradient(90deg, #E8623D 0%, #3F6FB5 100%); }
         .display-num { letter-spacing: -0.02em; }
         select { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231A2540' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.625rem center; padding-right: 1.75rem; }
-        input[type="date"] {
-            font-family: inherit;
-            -webkit-appearance: none;
-            appearance: none;
-            text-align: left;
-            min-height: 1.5em;
-            display: block;
-        }
-        input[type="date"]::-webkit-date-and-time-value { text-align: left; }
-        input[type="date"]::-webkit-datetime-edit { text-align: left; }
+        input[type="date"] { font-family: inherit; -webkit-appearance: none; appearance: none; text-align: left; min-height: 1.5em; display: block; }
         #err { display:none; padding:16px; margin:16px; background:#fee; border:1px solid #f88; border-radius:8px; font-family:monospace; font-size:12px; white-space:pre-wrap; color:#900; }
-        #fbStatus {
-            position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
-            background: rgba(26, 37, 64, 0.85); color: white;
-            padding: 4px 12px; border-radius: 999px; font-size: 11px;
-            z-index: 100; opacity: 0; transition: opacity 0.3s;
-            font-weight: 600; letter-spacing: 0.05em;
-        }
+        #fbStatus { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); background: rgba(26, 37, 64, 0.85); color: white; padding: 4px 12px; border-radius: 999px; font-size: 11px; z-index: 100; opacity: 0; transition: opacity 0.3s; font-weight: 600; letter-spacing: 0.05em; }
         #fbStatus.show { opacity: 1; }
+        .calc-keys button { transition: all 0.1s; }
+        .calc-keys button:active { transform: scale(0.95); }
     </style>
 </head>
 <body class="min-h-screen p-4 text-[#1A2540]">
@@ -54,12 +40,9 @@
     <div id="err"></div>
     <div id="fbStatus"></div>
 
-    <!-- Firebase ESM (CDN) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-        import {
-            getFirestore, doc, onSnapshot, setDoc, updateDoc, getDoc
-        } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, setDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAyPprhHv6LVfCes7BYiA6A7VA0Jp3I9xA",
@@ -93,10 +76,7 @@
         }
 
         window.addEventListener('error', function (ev) {
-            showErr('JS Error: ' + (ev.message || 'unknown') +
-                    '\nFile: ' + (ev.filename || '?') +
-                    '\nLine: ' + (ev.lineno || '?') + ':' + (ev.colno || '?') +
-                    (ev.error && ev.error.stack ? '\n\nStack:\n' + ev.error.stack : ''));
+            showErr('JS Error: ' + (ev.message || 'unknown') + '\nFile: ' + (ev.filename || '?') + '\nLine: ' + (ev.lineno || '?') + ':' + (ev.colno || '?') + (ev.error && ev.error.stack ? '\n\nStack:\n' + ev.error.stack : ''));
         });
 
         function showFbStatus(msg, ms) {
@@ -124,11 +104,8 @@
                                 cream: '#F2EBE0',
                                 creamInput: '#EFE8DC',
                                 brand: {
-                                    orange: '#E8623D',
-                                    blue: '#3F6FB5',
-                                    green: '#2EAE5C',
-                                    ink: '#1A2540',
-                                    muted: '#9AA0A6'
+                                    orange: '#E8623D', blue: '#3F6FB5', green: '#2EAE5C',
+                                    ink: '#1A2540', muted: '#9AA0A6'
                                 }
                             },
                             fontFamily: {
@@ -141,13 +118,8 @@
             }
 
             waitForFirebase(function () {
-                if (window.__fbError) {
-                    showErr('Firebase 初始化失敗: ' + window.__fbError);
-                    return;
-                }
-                try { run(); } catch (er) {
-                    showErr('Run error: ' + (er && er.message) + '\n\n' + (er && er.stack));
-                }
+                if (window.__fbError) { showErr('Firebase 初始化失敗: ' + window.__fbError); return; }
+                try { run(); } catch (er) { showErr('Run error: ' + (er && er.message) + '\n\n' + (er && er.stack)); }
             });
         }
 
@@ -183,8 +155,7 @@
             }
 
             function genId() {
-                return Math.random().toString(36).substring(2, 8) +
-                       Math.random().toString(36).substring(2, 8);
+                return Math.random().toString(36).substring(2, 8) + Math.random().toString(36).substring(2, 8);
             }
 
             function getOrCreateGroupId() {
@@ -192,10 +163,7 @@
                 var id = url.searchParams.get('id');
                 if (!id) {
                     id = localStorage.getItem('fat_miles_group_id');
-                    if (!id) {
-                        id = genId();
-                        localStorage.setItem('fat_miles_group_id', id);
-                    }
+                    if (!id) { id = genId(); localStorage.setItem('fat_miles_group_id', id); }
                     url.searchParams.set('id', id);
                     window.history.replaceState({}, '', url);
                 } else {
@@ -203,6 +171,29 @@
                 }
                 return id;
             }
+
+            // ===== CALCULATOR HELPERS =====
+            function hasOperator(s) {
+                if (!s) return false;
+                var rest = String(s).replace(/^-/, '');
+                return /[+\-*/×÷]/.test(rest);
+            }
+
+            function evalExpression(str) {
+                if (str === null || str === undefined || str === '') return null;
+                var s = String(str).replace(/×/g, '*').replace(/÷/g, '/').replace(/\s/g, '');
+                s = s.replace(/[+\-*/.]+$/, ''); // strip trailing operators
+                if (!s) return null;
+                if (!/^[0-9+\-*/.()]+$/.test(s)) return null;
+                try {
+                    var result = Function('"use strict"; return (' + s + ');')();
+                    if (typeof result === 'number' && isFinite(result)) {
+                        return Math.round(result * 100) / 100;
+                    }
+                } catch (er) {}
+                return null;
+            }
+            // ===== END CALCULATOR =====
 
             function svgIcon(paths, size) {
                 var props = {
@@ -219,6 +210,10 @@
                 e('path', { key: 3, d: 'M10 11v6' }),
                 e('path', { key: 4, d: 'M14 11v6' }),
                 e('path', { key: 5, d: 'M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2' })
+            ], s); }
+            function IconEdit(s) { return svgIcon([
+                e('path', { key: 1, d: 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7' }),
+                e('path', { key: 2, d: 'M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z' })
             ], s); }
             function IconCopy(s) { return svgIcon([
                 e('rect', { key: 1, x: 9, y: 9, width: 13, height: 13, rx: 2 }),
@@ -251,6 +246,16 @@
             function IconChevron(s, up) { return svgIcon([
                 e('polyline', { key: 1, points: up ? '18 15 12 9 6 15' : '6 9 12 15 18 9' })
             ], s); }
+            function IconCalc(s) { return svgIcon([
+                e('rect', { key: 1, x: 4, y: 2, width: 16, height: 20, rx: 2 }),
+                e('line', { key: 2, x1: 8, y1: 6, x2: 16, y2: 6 }),
+                e('line', { key: 3, x1: 8, y1: 14, x2: 8, y2: 14 }),
+                e('line', { key: 4, x1: 12, y1: 14, x2: 12, y2: 14 }),
+                e('line', { key: 5, x1: 16, y1: 14, x2: 16, y2: 14 }),
+                e('line', { key: 6, x1: 8, y1: 18, x2: 8, y2: 18 }),
+                e('line', { key: 7, x1: 12, y1: 18, x2: 12, y2: 18 }),
+                e('line', { key: 8, x1: 16, y1: 18, x2: 16, y2: 18 })
+            ], s); }
 
             function ConfirmModal(props) {
                 var data = props.data;
@@ -276,6 +281,158 @@
                 );
             }
 
+            // ===== CALCULATOR KEYPAD =====
+            function CalcKeypad(props) {
+                // props.value (string), props.setValue, props.onClose
+                function append(ch) {
+                    props.setValue(function (v) {
+                        // Prevent two operators in a row (except minus after operator)
+                        if (/[+\-*/.]/.test(ch) && /[+\-*/.]$/.test(v) && !(ch === '-' && /[+*/]$/.test(v))) {
+                            return v.slice(0, -1) + ch;
+                        }
+                        return v + ch;
+                    });
+                }
+                function back() {
+                    props.setValue(function (v) { return v.slice(0, -1); });
+                }
+                function clear() { props.setValue(''); }
+                function evalNow() {
+                    var r = evalExpression(props.value);
+                    if (r !== null) props.setValue(String(r));
+                }
+
+                var btnBase = 'h-12 rounded-xl font-display text-lg font-semibold bg-creamInput text-brand-ink active:bg-gray-300';
+                var opBtn = 'h-12 rounded-xl font-display text-lg font-semibold bg-white text-brand-orange border-2 border-brand-orange active:bg-orange-50';
+                var eqBtn = 'h-12 rounded-xl font-display text-lg font-semibold bg-brand-green text-white active:opacity-80';
+
+                function key(label, onClick, cls) {
+                    return e('button', { type: 'button', onClick: onClick, className: cls || btnBase }, label);
+                }
+
+                return e('div', { className: 'calc-keys mt-2 p-3 bg-white rounded-xl border border-creamInput' },
+                    e('div', { className: 'grid grid-cols-4 gap-2' },
+                        key('C', clear, btnBase + ' text-brand-orange'),
+                        key('⌫', back, btnBase),
+                        key('(', function () { append('('); }, btnBase),
+                        key(')', function () { append(')'); }, btnBase),
+                        key('7', function () { append('7'); }),
+                        key('8', function () { append('8'); }),
+                        key('9', function () { append('9'); }),
+                        key('÷', function () { append('/'); }, opBtn),
+                        key('4', function () { append('4'); }),
+                        key('5', function () { append('5'); }),
+                        key('6', function () { append('6'); }),
+                        key('×', function () { append('*'); }, opBtn),
+                        key('1', function () { append('1'); }),
+                        key('2', function () { append('2'); }),
+                        key('3', function () { append('3'); }),
+                        key('−', function () { append('-'); }, opBtn),
+                        key('0', function () { append('0'); }),
+                        key('.', function () { append('.'); }),
+                        key('=', evalNow, eqBtn),
+                        key('+', function () { append('+'); }, opBtn)
+                    ),
+                    e('button', {
+                        type: 'button',
+                        onClick: props.onClose,
+                        className: 'w-full mt-2 py-2 text-xs font-semibold tracking-wider text-brand-muted'
+                    }, 'CLOSE KEYPAD ▲')
+                );
+            }
+            // ===== END CALCULATOR KEYPAD =====
+
+            // ===== EDIT MODAL =====
+            function EditItemModal(props) {
+                var item = props.item;
+                var s1 = useState(''); var name = s1[0], setName = s1[1];
+                var s2 = useState(''); var priceStr = s2[0], setPriceStr = s2[1];
+                var s3 = useState(false); var showCalc = s3[0], setShowCalc = s3[1];
+
+                useEffect(function () {
+                    if (item) {
+                        setName(item.name);
+                        setPriceStr(String(item.price));
+                        setShowCalc(false);
+                    }
+                }, [item ? item.id : null]);
+
+                if (!item) return null;
+
+                var evaluated = evalExpression(priceStr);
+                var showCalcResult = hasOperator(priceStr) && evaluated !== null;
+
+                function save() {
+                    if (!name.trim()) return;
+                    if (evaluated === null || evaluated <= 0) return;
+                    props.onSave(item.id, { name: name.trim(), price: evaluated });
+                }
+
+                return e('div', { className: 'fixed inset-0 bg-black bg-opacity-40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4' },
+                    e('div', { className: 'bg-white rounded-t-3xl sm:rounded-2xl p-6 max-w-md w-full shadow-xl max-h-[90vh] overflow-y-auto' },
+                        e('div', { className: 'flex justify-between items-center mb-5' },
+                            e('h3', { className: 'font-display text-xl font-bold' }, '編輯項目'),
+                            e('button', {
+                                onClick: props.onClose,
+                                className: 'text-brand-muted text-2xl leading-none px-2'
+                            }, '✕')
+                        ),
+                        e('div', { className: 'space-y-4' },
+                            e('div', null,
+                                e('label', { className: 'block text-[10px] font-semibold tracking-[0.2em] text-brand-muted mb-1.5' }, 'ITEM NAME'),
+                                e('input', {
+                                    type: 'text', value: name,
+                                    onChange: function (ev) { setName(ev.target.value); },
+                                    className: 'w-full px-4 py-3 rounded-xl bg-creamInput border-0 outline-none focus:ring-2 focus:ring-brand-orange font-medium'
+                                })
+                            ),
+                            e('div', null,
+                                e('label', { className: 'block text-[10px] font-semibold tracking-[0.2em] text-brand-muted mb-1.5' },
+                                    'AMOUNT (' + item.currency + ') · 可用 + − × ÷'),
+                                e('div', { className: 'flex gap-2' },
+                                    e('input', {
+                                        type: 'text',
+                                        inputMode: 'text',
+                                        value: priceStr,
+                                        onChange: function (ev) { setPriceStr(ev.target.value); },
+                                        placeholder: '0.00 or 10+20+30',
+                                        className: 'flex-1 min-w-0 px-4 py-3 rounded-xl bg-creamInput border-0 outline-none focus:ring-2 focus:ring-brand-orange placeholder-gray-400 font-display text-lg font-semibold'
+                                    }),
+                                    e('button', {
+                                        type: 'button',
+                                        onClick: function () { setShowCalc(!showCalc); },
+                                        className: 'px-4 rounded-xl ' + (showCalc ? 'bg-brand-orange text-white' : 'bg-creamInput text-brand-ink')
+                                    }, IconCalc(20))
+                                ),
+                                showCalcResult ? e('p', { className: 'text-xs text-brand-muted mt-1.5 font-medium' },
+                                    '= ', e('span', { className: 'text-brand-green font-bold text-base' }, evaluated.toFixed(2)),
+                                    ' ' + item.currency
+                                ) : null,
+                                showCalc ? e(CalcKeypad, {
+                                    value: priceStr,
+                                    setValue: setPriceStr,
+                                    onClose: function () { setShowCalc(false); }
+                                }) : null
+                            ),
+                            e('div', { className: 'flex gap-3 pt-2' },
+                                e('button', {
+                                    type: 'button',
+                                    onClick: props.onClose,
+                                    className: 'flex-1 py-3 rounded-xl bg-creamInput text-brand-ink font-semibold'
+                                }, '取消'),
+                                e('button', {
+                                    type: 'button',
+                                    onClick: save,
+                                    disabled: !name.trim() || evaluated === null || evaluated <= 0,
+                                    className: 'flex-1 py-3 rounded-xl bg-brand-orange text-white font-semibold disabled:opacity-50'
+                                }, '儲存')
+                            )
+                        )
+                    )
+                );
+            }
+            // ===== END EDIT MODAL =====
+
             function App() {
                 var s = useState([]); var items = s[0], setItems = s[1];
                 var s2 = useState(DEFAULT_RATES); var rates = s2[0], setRates = s2[1];
@@ -294,6 +451,8 @@
                 var s13 = useState(false); var menuOpen = s13[0], setMenuOpen = s13[1];
                 var s14 = useState(true); var loading = s14[0], setLoading = s14[1];
                 var s15 = useState(false); var settledOpen = s15[0], setSettledOpen = s15[1];
+                var s16 = useState(false); var showCalc = s16[0], setShowCalc = s16[1];
+                var s17 = useState(null); var editingItem = s17[0], setEditingItem = s17[1];
 
                 var dateRef = useRef(null);
                 var groupIdRef = useRef(null);
@@ -368,23 +527,37 @@
                 }
 
                 function addItem(ev) {
-                    ev.preventDefault();
-                    if (!itemName || !price || parseFloat(price) <= 0) return;
+                    if (ev) ev.preventDefault();
+                    if (!itemName.trim()) return;
+                    var amount = evalExpression(price);
+                    if (amount === null || amount <= 0) return;
                     var rate = rates[currency] || 1;
                     var newItem = {
-                        id: Date.now(), name: itemName, price: parseFloat(price),
+                        id: Date.now(), name: itemName.trim(), price: amount,
                         currency: currency, rate: rate, payer: payer, splitType: splitType, date: date
                     };
                     var newItems = items.concat([newItem]);
                     setItems(newItems);
                     saveField('items', newItems);
                     setItemName(''); setPrice('');
+                    setShowCalc(false);
                 }
 
                 function deleteItem(id) {
                     var newItems = items.filter(function (i) { return i.id !== id; });
                     setItems(newItems);
                     saveField('items', newItems);
+                }
+
+                function updateItem(id, changes) {
+                    var newItems = items.map(function (it) {
+                        if (it.id === id) return Object.assign({}, it, changes);
+                        return it;
+                    });
+                    setItems(newItems);
+                    saveField('items', newItems);
+                    setEditingItem(null);
+                    showToast('已更新');
                 }
 
                 function settleDay(d) {
@@ -563,8 +736,12 @@
                     return 'bg-white text-brand-ink border-2 border-brand-ink shadow-sm';
                 }
 
-                var livePreview = (price && currency !== 'HKD')
-                    ? (parseFloat(price) * (rates[currency] || 0)).toFixed(2) : null;
+                // === Amount preview logic ===
+                var evalAmount = evalExpression(price);
+                var showExprResult = hasOperator(price) && evalAmount !== null;
+                var showHKD = evalAmount !== null && currency !== 'HKD';
+                var hkdPreview = showHKD ? (evalAmount * (rates[currency] || 0)) : null;
+                // ===
 
                 function openDatePicker() {
                     var el = dateRef.current;
@@ -586,6 +763,11 @@
                 return e('div', { className: 'max-w-md mx-auto pb-16 relative' },
                     e(ConfirmModal, { data: confirmData, onClose: function () { setConfirmData(null); } }),
                     e(Toast, { msg: toast }),
+                    e(EditItemModal, {
+                        item: editingItem,
+                        onClose: function () { setEditingItem(null); },
+                        onSave: updateItem
+                    }),
 
                     e('div', { className: 'flex items-center justify-between pt-4 pb-2 px-1' },
                         e('div', { className: 'w-10' }),
@@ -697,7 +879,7 @@
                             ),
                             e('div', null,
                                 e('div', { className: 'flex justify-between items-center mb-1.5' },
-                                    e('label', { className: 'text-[10px] font-semibold tracking-[0.2em] text-brand-muted' }, 'AMOUNT'),
+                                    e('label', { className: 'text-[10px] font-semibold tracking-[0.2em] text-brand-muted' }, 'AMOUNT · 可用 + − × ÷'),
                                     currency !== 'HKD' ? e('button', {
                                         type: 'button',
                                         onClick: function () { setCurrency('HKD'); },
@@ -711,16 +893,34 @@
                                         className: 'w-24 flex-shrink-0 px-3 py-3 rounded-xl bg-creamInput border-0 outline-none focus:ring-2 focus:ring-brand-orange font-semibold text-sm'
                                     }, CURRENCY_ORDER.map(function (c) { return e('option', { key: c, value: c }, c); })),
                                     e('input', {
-                                        type: 'number', value: price,
+                                        type: 'text',
+                                        inputMode: 'text',
+                                        value: price,
                                         onChange: function (ev) { setPrice(ev.target.value); },
-                                        placeholder: '0.00', step: '0.01',
+                                        placeholder: '0.00 or 10+20+30',
                                         className: 'flex-1 min-w-0 px-4 py-3 rounded-xl bg-creamInput border-0 outline-none focus:ring-2 focus:ring-brand-orange placeholder-gray-400 font-display text-lg font-semibold'
-                                    })
+                                    }),
+                                    e('button', {
+                                        type: 'button',
+                                        onClick: function () { setShowCalc(!showCalc); },
+                                        className: 'px-4 rounded-xl flex items-center justify-center ' + (showCalc ? 'bg-brand-orange text-white' : 'bg-creamInput text-brand-ink')
+                                    }, IconCalc(20))
                                 ),
-                                livePreview ? e('p', { className: 'text-xs text-brand-muted mt-1.5 font-medium' },
-                                    '≈ ', e('span', { className: 'text-brand-ink font-semibold' }, 'HK$' + livePreview),
+                                showExprResult ? e('p', { className: 'text-xs text-brand-muted mt-1.5 font-medium' },
+                                    '= ', e('span', { className: 'text-brand-green font-bold text-base' }, evalAmount.toFixed(2)),
+                                    ' ' + currency,
+                                    showHKD ? e('span', { className: 'text-brand-muted' },
+                                        ' · ≈ HK$' + hkdPreview.toFixed(2)
+                                    ) : null
+                                ) : (showHKD ? e('p', { className: 'text-xs text-brand-muted mt-1.5 font-medium' },
+                                    '≈ ', e('span', { className: 'text-brand-ink font-semibold' }, 'HK$' + hkdPreview.toFixed(2)),
                                     ' @ rate ' + rates[currency]
-                                ) : null
+                                ) : null),
+                                showCalc ? e(CalcKeypad, {
+                                    value: price,
+                                    setValue: setPrice,
+                                    onClose: function () { setShowCalc(false); }
+                                }) : null
                             ),
                             e('div', null,
                                 e('label', { className: 'block text-[10px] font-semibold tracking-[0.2em] text-brand-muted mb-1.5' }, 'DATE'),
@@ -828,7 +1028,11 @@
                                         var tagText = it.splitType === 'split' ? 'Shared'
                                             : it.splitType === 'forUser1' ? ('For ' + USER_1) : ('For ' + USER_2);
                                         return e('div', { key: it.id, className: 'flex justify-between items-center bg-creamInput rounded-xl px-4 py-3' },
-                                            e('div', { className: 'min-w-0 flex-1' },
+                                            e('button', {
+                                                type: 'button',
+                                                onClick: function () { setEditingItem(it); },
+                                                className: 'min-w-0 flex-1 text-left active:opacity-60'
+                                            },
                                                 e('div', { className: 'font-semibold truncate' }, it.name),
                                                 e('div', { className: 'text-xs text-brand-muted mt-0.5 font-medium' },
                                                     e('span', { className: payerColor + ' font-semibold' }, it.payer),
@@ -837,12 +1041,16 @@
                                                         ' · ' + it.currency + ' ' + it.price.toFixed(2)) : null
                                                 )
                                             ),
-                                            e('div', { className: 'flex items-center gap-3 ml-2' },
+                                            e('div', { className: 'flex items-center gap-2 ml-2' },
                                                 e('span', { className: 'font-display font-semibold text-lg display-num' }, '$' + hkdOf(it).toFixed(2)),
                                                 e('button', {
+                                                    onClick: function () { setEditingItem(it); },
+                                                    className: 'text-brand-muted hover:text-brand-blue transition p-1.5'
+                                                }, IconEdit(16)),
+                                                e('button', {
                                                     onClick: function () { deleteItem(it.id); },
-                                                    className: 'text-brand-muted hover:text-brand-orange transition p-1'
-                                                }, IconTrash(18))
+                                                    className: 'text-brand-muted hover:text-brand-orange transition p-1.5'
+                                                }, IconTrash(16))
                                             )
                                         );
                                     })
