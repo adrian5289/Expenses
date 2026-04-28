@@ -6,7 +6,7 @@
     <title>Expense Splitter (Fat & Miles)</title>
 
     <!-- iOS Web App -->
-    <meta name="apple-mobile-web-app-title" content="💰">
+    <meta name="apple-mobile-web-app-title" content="夾錢">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -27,7 +27,7 @@
         .gradient-bar { background: linear-gradient(90deg, #E8623D 0%, #3F6FB5 100%); }
         .display-num { letter-spacing: -0.02em; }
         select { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231A2540' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.625rem center; padding-right: 1.75rem; }
-        input[type="date"] { font-family: inherit; -webkit-appearance: none; appearance: none; text-align: left; min-height: 1.5em; display: block; }
+        input[type="date"] { font-family: inherit; -webkit-appearance: none; appearance: none; min-height: 1.5em; }
         #err { display:none; padding:16px; margin:16px; background:#fee; border:1px solid #f88; border-radius:8px; font-family:monospace; font-size:12px; white-space:pre-wrap; color:#900; }
         #fbStatus { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); background: rgba(26, 37, 64, 0.85); color: white; padding: 4px 12px; border-radius: 999px; font-size: 11px; z-index: 100; opacity: 0; transition: opacity 0.3s; font-weight: 600; letter-spacing: 0.05em; }
         #fbStatus.show { opacity: 1; }
@@ -182,7 +182,7 @@
             function evalExpression(str) {
                 if (str === null || str === undefined || str === '') return null;
                 var s = String(str).replace(/×/g, '*').replace(/÷/g, '/').replace(/\s/g, '');
-                s = s.replace(/[+\-*/.]+$/, ''); // strip trailing operators
+                s = s.replace(/[+\-*/.]+$/, '');
                 if (!s) return null;
                 if (!/^[0-9+\-*/.()]+$/.test(s)) return null;
                 try {
@@ -262,7 +262,7 @@
                 if (!data) return null;
                 return e('div', { className: 'fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4' },
                     e('div', { className: 'bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl' },
-                        e('p', { className: 'text-brand-ink mb-5 font-semibold' }, data.message),
+                        e('p', { className: 'text-brand-ink mb-5 font-semibold whitespace-pre-line' }, data.message),
                         e('div', { className: 'flex gap-3 justify-end' },
                             e('button', { onClick: props.onClose, className: 'px-4 py-2 rounded-xl bg-creamInput text-brand-ink font-semibold' }, '取消'),
                             e('button', {
@@ -283,10 +283,8 @@
 
             // ===== CALCULATOR KEYPAD =====
             function CalcKeypad(props) {
-                // props.value (string), props.setValue, props.onClose
                 function append(ch) {
                     props.setValue(function (v) {
-                        // Prevent two operators in a row (except minus after operator)
                         if (/[+\-*/.]/.test(ch) && /[+\-*/.]$/.test(v) && !(ch === '-' && /[+*/]$/.test(v))) {
                             return v.slice(0, -1) + ch;
                         }
@@ -348,11 +346,15 @@
                 var s1 = useState(''); var name = s1[0], setName = s1[1];
                 var s2 = useState(''); var priceStr = s2[0], setPriceStr = s2[1];
                 var s3 = useState(false); var showCalc = s3[0], setShowCalc = s3[1];
+                var s4 = useState(USER_1); var payer = s4[0], setPayer = s4[1];
+                var s5 = useState('split'); var splitType = s5[0], setSplitType = s5[1];
 
                 useEffect(function () {
                     if (item) {
                         setName(item.name);
                         setPriceStr(String(item.price));
+                        setPayer(item.payer);
+                        setSplitType(item.splitType);
                         setShowCalc(false);
                     }
                 }, [item ? item.id : null]);
@@ -362,10 +364,22 @@
                 var evaluated = evalExpression(priceStr);
                 var showCalcResult = hasOperator(priceStr) && evaluated !== null;
 
+                function pillBtnLocal(active, color) {
+                    if (!active) return 'bg-creamInput text-brand-ink border border-transparent';
+                    if (color === 'orange') return 'bg-white text-brand-orange border-2 border-brand-orange shadow-sm';
+                    if (color === 'blue') return 'bg-white text-brand-blue border-2 border-brand-blue shadow-sm';
+                    return 'bg-white text-brand-ink border-2 border-brand-ink shadow-sm';
+                }
+
                 function save() {
                     if (!name.trim()) return;
                     if (evaluated === null || evaluated <= 0) return;
-                    props.onSave(item.id, { name: name.trim(), price: evaluated });
+                    props.onSave(item.id, {
+                        name: name.trim(),
+                        price: evaluated,
+                        payer: payer,
+                        splitType: splitType
+                    });
                 }
 
                 return e('div', { className: 'fixed inset-0 bg-black bg-opacity-40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4' },
@@ -414,6 +428,41 @@
                                     onClose: function () { setShowCalc(false); }
                                 }) : null
                             ),
+                            e('div', null,
+                                e('label', { className: 'block text-[10px] font-semibold tracking-[0.2em] text-brand-muted mb-1.5' }, 'PAID BY'),
+                                e('div', { className: 'grid grid-cols-2 gap-2' },
+                                    e('button', {
+                                        type: 'button',
+                                        onClick: function () { setPayer(USER_1); },
+                                        className: 'py-3 rounded-xl font-semibold transition ' + pillBtnLocal(payer === USER_1, 'orange')
+                                    }, USER_1),
+                                    e('button', {
+                                        type: 'button',
+                                        onClick: function () { setPayer(USER_2); },
+                                        className: 'py-3 rounded-xl font-semibold transition ' + pillBtnLocal(payer === USER_2, 'blue')
+                                    }, USER_2)
+                                )
+                            ),
+                            e('div', null,
+                                e('label', { className: 'block text-[10px] font-semibold tracking-[0.2em] text-brand-muted mb-1.5' }, 'SPLIT'),
+                                e('div', { className: 'grid grid-cols-3 gap-2' },
+                                    e('button', {
+                                        type: 'button',
+                                        onClick: function () { setSplitType('split'); },
+                                        className: 'py-3 rounded-xl font-semibold text-sm transition ' + pillBtnLocal(splitType === 'split', 'ink')
+                                    }, 'Shared'),
+                                    e('button', {
+                                        type: 'button',
+                                        onClick: function () { setSplitType('forUser1'); },
+                                        className: 'py-3 rounded-xl font-semibold text-sm transition ' + pillBtnLocal(splitType === 'forUser1', 'orange')
+                                    }, USER_1),
+                                    e('button', {
+                                        type: 'button',
+                                        onClick: function () { setSplitType('forUser2'); },
+                                        className: 'py-3 rounded-xl font-semibold text-sm transition ' + pillBtnLocal(splitType === 'forUser2', 'blue')
+                                    }, USER_2)
+                                )
+                            ),
                             e('div', { className: 'flex gap-3 pt-2' },
                                 e('button', {
                                     type: 'button',
@@ -454,7 +503,6 @@
                 var s16 = useState(false); var showCalc = s16[0], setShowCalc = s16[1];
                 var s17 = useState(null); var editingItem = s17[0], setEditingItem = s17[1];
 
-                var dateRef = useRef(null);
                 var groupIdRef = useRef(null);
                 var loadedRef = useRef(false);
                 var rateSaveTimerRef = useRef(null);
@@ -594,6 +642,17 @@
                     saveField('settled', []);
                 }
 
+                function clearSettled() {
+                    var newItems = items.filter(function (it) {
+                        return settled.indexOf(it.date) === -1;
+                    });
+                    setItems(newItems);
+                    setSettled([]);
+                    saveField('items', newItems);
+                    saveField('settled', []);
+                    showToast('已清除已對數記錄');
+                }
+
                 function hkdOf(item) { return item.price * (item.rate || 1); }
 
                 var groups = useMemo(function () {
@@ -720,7 +779,7 @@
                     var url = window.location.href;
                     if (navigator.share) {
                         navigator.share({
-                            title: 'Fat & Miles 💰',
+                            title: 'Fat & Miles 夾錢',
                             text: '一齊夾錢計數！',
                             url: url
                         }).catch(function () {});
@@ -736,22 +795,10 @@
                     return 'bg-white text-brand-ink border-2 border-brand-ink shadow-sm';
                 }
 
-                // === Amount preview logic ===
                 var evalAmount = evalExpression(price);
                 var showExprResult = hasOperator(price) && evalAmount !== null;
                 var showHKD = evalAmount !== null && currency !== 'HKD';
                 var hkdPreview = showHKD ? (evalAmount * (rates[currency] || 0)) : null;
-                // ===
-
-                function openDatePicker() {
-                    var el = dateRef.current;
-                    if (!el) return;
-                    if (typeof el.showPicker === 'function') {
-                        try { el.showPicker(); return; } catch (er) {}
-                    }
-                    el.focus();
-                    el.click();
-                }
 
                 if (loading) {
                     return e('div', { className: 'max-w-md mx-auto pt-20 text-center' },
@@ -924,21 +971,19 @@
                             ),
                             e('div', null,
                                 e('label', { className: 'block text-[10px] font-semibold tracking-[0.2em] text-brand-muted mb-1.5' }, 'DATE'),
-                                e('div', { className: 'relative' },
-                                    e('button', {
-                                        type: 'button',
-                                        onClick: openDatePicker,
-                                        className: 'w-full px-4 py-3 rounded-xl bg-creamInput border-0 outline-none flex items-center justify-between font-semibold text-left'
+                                e('div', { className: 'relative rounded-xl bg-creamInput overflow-hidden' },
+                                    e('div', {
+                                        className: 'w-full px-4 py-3 flex items-center justify-between font-semibold pointer-events-none'
                                     },
                                         e('span', null, formatDate(date) + ' · ' + (new Date(date + 'T00:00:00')).getFullYear()),
                                         IconCalendar(18)
                                     ),
                                     e('input', {
-                                        ref: dateRef,
-                                        type: 'date', value: date,
+                                        type: 'date',
+                                        value: date,
                                         onChange: function (ev) { setDate(ev.target.value); },
-                                        style: { position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', pointerEvents: 'none' },
-                                        tabIndex: -1, 'aria-hidden': 'true'
+                                        className: 'absolute inset-0 w-full h-full opacity-0 cursor-pointer',
+                                        style: { fontSize: '16px' }
                                     })
                                 )
                             ),
@@ -1060,16 +1105,27 @@
                     ) : null,
 
                     settledGroups.length > 0 ? e('div', { className: 'bg-white rounded-2xl shadow-sm border-l-4 border-brand-green overflow-hidden' },
-                        e('button', {
-                            onClick: function () { setSettledOpen(!settledOpen); },
-                            className: 'w-full px-4 py-4 flex justify-between items-center text-left'
-                        },
-                            e('div', null,
-                                e('p', { className: 'text-[10px] font-semibold tracking-[0.2em] text-brand-green' },
-                                    '✓ 已對數 · ' + settledGroups.length + '日'),
-                                e('p', { className: 'font-display text-2xl font-bold display-num mt-0.5' }, 'HK$' + settledTotal.toFixed(2))
+                        e('div', { className: 'w-full px-4 py-4 flex justify-between items-center' },
+                            e('button', {
+                                onClick: function () { setSettledOpen(!settledOpen); },
+                                className: 'flex-1 flex justify-between items-center text-left min-w-0'
+                            },
+                                e('div', { className: 'min-w-0' },
+                                    e('p', { className: 'text-[10px] font-semibold tracking-[0.2em] text-brand-green' },
+                                        '✓ 已對數 · ' + settledGroups.length + '日'),
+                                    e('p', { className: 'font-display text-2xl font-bold display-num mt-0.5' }, 'HK$' + settledTotal.toFixed(2))
+                                ),
+                                e('div', { className: 'text-brand-muted ml-2' }, IconChevron(20, settledOpen))
                             ),
-                            e('div', { className: 'text-brand-muted' }, IconChevron(20, settledOpen))
+                            e('button', {
+                                onClick: function () {
+                                    setConfirmData({
+                                        message: '清除所有已對數記錄？\n(' + settledGroups.length + '日 · HK$' + settledTotal.toFixed(2) + ')\n\n⚠️ 不能復原',
+                                        onConfirm: clearSettled
+                                    });
+                                },
+                                className: 'ml-3 text-[10px] font-semibold text-brand-orange tracking-wider px-3 py-2 bg-creamInput rounded-lg active:bg-orange-100 flex-shrink-0'
+                            }, '🗑 CLEAR')
                         ),
                         settledOpen ? e('div', { className: 'px-4 pb-4 space-y-2' },
                             settledGroups.map(function (g) {
