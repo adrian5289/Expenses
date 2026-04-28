@@ -256,6 +256,10 @@
                 e('line', { key: 7, x1: 12, y1: 18, x2: 12, y2: 18 }),
                 e('line', { key: 8, x1: 16, y1: 18, x2: 16, y2: 18 })
             ], s); }
+            function IconUndo(s) { return svgIcon([
+                e('path', { key: 1, d: 'M3 7v6h6' }),
+                e('path', { key: 2, d: 'M21 17a9 9 0 0 0-15-6.7L3 13' })
+            ], s); }
 
             function ConfirmModal(props) {
                 var data = props.data;
@@ -502,6 +506,7 @@
                 var s15 = useState(false); var settledOpen = s15[0], setSettledOpen = s15[1];
                 var s16 = useState(false); var showCalc = s16[0], setShowCalc = s16[1];
                 var s17 = useState(null); var editingItem = s17[0], setEditingItem = s17[1];
+                var s18 = useState({}); var settledDayOpen = s18[0], setSettledDayOpen = s18[1];
 
                 var groupIdRef = useRef(null);
                 var loadedRef = useRef(false);
@@ -617,6 +622,14 @@
                     var newSettled = settled.filter(function (x) { return x !== d; });
                     setSettled(newSettled);
                     saveField('settled', newSettled);
+                }
+
+                function toggleSettledDay(d) {
+                    setSettledDayOpen(function (prev) {
+                        var next = Object.assign({}, prev);
+                        next[d] = !prev[d];
+                        return next;
+                    });
                 }
 
                 function updateRate(cur, val) {
@@ -804,6 +817,44 @@
                     return e('div', { className: 'max-w-md mx-auto pt-20 text-center' },
                         e('div', { className: 'inline-block animate-pulse text-brand-muted font-semibold tracking-widest' },
                             '☁ LOADING...')
+                    );
+                }
+
+                // Helper: render line items list (used by both active & settled)
+                function renderItemList(g, readonly) {
+                    return e('div', { className: 'space-y-2' },
+                        g.items.map(function (it) {
+                            var payerColor = it.payer === USER_1 ? 'text-brand-orange' : 'text-brand-blue';
+                            var tagText = it.splitType === 'split' ? 'Shared'
+                                : it.splitType === 'forUser1' ? ('For ' + USER_1) : ('For ' + USER_2);
+                            return e('div', { key: it.id, className: 'flex justify-between items-center bg-creamInput rounded-xl px-4 py-3' },
+                                e('button', {
+                                    type: 'button',
+                                    onClick: readonly ? null : function () { setEditingItem(it); },
+                                    disabled: readonly,
+                                    className: 'min-w-0 flex-1 text-left ' + (readonly ? '' : 'active:opacity-60')
+                                },
+                                    e('div', { className: 'font-semibold truncate' }, it.name),
+                                    e('div', { className: 'text-xs text-brand-muted mt-0.5 font-medium' },
+                                        e('span', { className: payerColor + ' font-semibold' }, it.payer),
+                                        ' paid · ' + tagText,
+                                        it.currency !== 'HKD' ? e('span', { className: 'ml-1' },
+                                            ' · ' + it.currency + ' ' + it.price.toFixed(2)) : null
+                                    )
+                                ),
+                                e('div', { className: 'flex items-center gap-2 ml-2' },
+                                    e('span', { className: 'font-display font-semibold text-lg display-num' }, '$' + hkdOf(it).toFixed(2)),
+                                    !readonly ? e('button', {
+                                        onClick: function () { setEditingItem(it); },
+                                        className: 'text-brand-muted hover:text-brand-blue transition p-1.5'
+                                    }, IconEdit(16)) : null,
+                                    !readonly ? e('button', {
+                                        onClick: function () { deleteItem(it.id); },
+                                        className: 'text-brand-muted hover:text-brand-orange transition p-1.5'
+                                    }, IconTrash(16)) : null
+                                )
+                            );
+                        })
                     );
                 }
 
@@ -1067,39 +1118,7 @@
                                         g.net > 0 ? USER_1 : USER_2),
                                     ' HK$' + Math.abs(g.net).toFixed(2)
                                 ) : null,
-                                e('div', { className: 'space-y-2' },
-                                    g.items.map(function (it) {
-                                        var payerColor = it.payer === USER_1 ? 'text-brand-orange' : 'text-brand-blue';
-                                        var tagText = it.splitType === 'split' ? 'Shared'
-                                            : it.splitType === 'forUser1' ? ('For ' + USER_1) : ('For ' + USER_2);
-                                        return e('div', { key: it.id, className: 'flex justify-between items-center bg-creamInput rounded-xl px-4 py-3' },
-                                            e('button', {
-                                                type: 'button',
-                                                onClick: function () { setEditingItem(it); },
-                                                className: 'min-w-0 flex-1 text-left active:opacity-60'
-                                            },
-                                                e('div', { className: 'font-semibold truncate' }, it.name),
-                                                e('div', { className: 'text-xs text-brand-muted mt-0.5 font-medium' },
-                                                    e('span', { className: payerColor + ' font-semibold' }, it.payer),
-                                                    ' paid · ' + tagText,
-                                                    it.currency !== 'HKD' ? e('span', { className: 'ml-1' },
-                                                        ' · ' + it.currency + ' ' + it.price.toFixed(2)) : null
-                                                )
-                                            ),
-                                            e('div', { className: 'flex items-center gap-2 ml-2' },
-                                                e('span', { className: 'font-display font-semibold text-lg display-num' }, '$' + hkdOf(it).toFixed(2)),
-                                                e('button', {
-                                                    onClick: function () { setEditingItem(it); },
-                                                    className: 'text-brand-muted hover:text-brand-blue transition p-1.5'
-                                                }, IconEdit(16)),
-                                                e('button', {
-                                                    onClick: function () { deleteItem(it.id); },
-                                                    className: 'text-brand-muted hover:text-brand-orange transition p-1.5'
-                                                }, IconTrash(16))
-                                            )
-                                        );
-                                    })
-                                )
+                                renderItemList(g, false)
                             );
                         })
                     ) : null,
@@ -1129,28 +1148,59 @@
                         ),
                         settledOpen ? e('div', { className: 'px-4 pb-4 space-y-2' },
                             settledGroups.map(function (g) {
-                                return e('div', { key: g.date, className: 'flex justify-between items-center bg-creamInput rounded-xl px-3 py-2.5' },
-                                    e('div', { className: 'min-w-0 flex-1' },
-                                        e('p', { className: 'text-[10px] font-semibold tracking-[0.15em] text-brand-muted' }, formatDate(g.date).toUpperCase()),
-                                        e('p', { className: 'font-display font-bold text-base display-num' }, 'HK$' + g.total.toFixed(2)),
-                                        Math.abs(g.net) > 0.01 ? e('p', { className: 'text-[11px] text-brand-muted font-medium mt-0.5' },
-                                            e('span', { className: g.net > 0 ? 'text-brand-blue font-semibold' : 'text-brand-orange font-semibold' },
-                                                g.net > 0 ? USER_2 : USER_1),
-                                            ' → ',
-                                            e('span', { className: g.net > 0 ? 'text-brand-orange font-semibold' : 'text-brand-blue font-semibold' },
-                                                g.net > 0 ? USER_1 : USER_2),
-                                            ' HK$' + Math.abs(g.net).toFixed(2)
-                                        ) : null
-                                    ),
-                                    e('button', {
-                                        onClick: function () {
-                                            setConfirmData({
-                                                message: '展開 ' + formatDate(g.date) + ' 嘅詳情？',
-                                                onConfirm: function () { unsettleDay(g.date); }
-                                            });
+                                var dayOpen = !!settledDayOpen[g.date];
+                                return e('div', { key: g.date, className: 'bg-creamInput rounded-xl overflow-hidden' },
+                                    e('div', { className: 'flex justify-between items-center px-3 py-2.5' },
+                                        e('button', {
+                                            onClick: function () { toggleSettledDay(g.date); },
+                                            className: 'flex-1 min-w-0 text-left flex items-center gap-2 active:opacity-60'
                                         },
-                                        className: 'text-[10px] font-semibold text-brand-orange tracking-wider px-2 py-1.5 ml-2'
-                                    }, '展開')
+                                            e('div', { className: 'text-brand-muted' }, IconChevron(16, dayOpen)),
+                                            e('div', { className: 'min-w-0 flex-1' },
+                                                e('p', { className: 'text-[10px] font-semibold tracking-[0.15em] text-brand-muted' }, formatDate(g.date).toUpperCase()),
+                                                e('p', { className: 'font-display font-bold text-base display-num' }, 'HK$' + g.total.toFixed(2)),
+                                                Math.abs(g.net) > 0.01 ? e('p', { className: 'text-[11px] text-brand-muted font-medium mt-0.5' },
+                                                    e('span', { className: g.net > 0 ? 'text-brand-blue font-semibold' : 'text-brand-orange font-semibold' },
+                                                        g.net > 0 ? USER_2 : USER_1),
+                                                    ' → ',
+                                                    e('span', { className: g.net > 0 ? 'text-brand-orange font-semibold' : 'text-brand-blue font-semibold' },
+                                                        g.net > 0 ? USER_1 : USER_2),
+                                                    ' HK$' + Math.abs(g.net).toFixed(2)
+                                                ) : null
+                                            )
+                                        ),
+                                        e('button', {
+                                            onClick: function () {
+                                                setConfirmData({
+                                                    message: '解除「已對數」標記？\n(' + formatDate(g.date) + ' 會返到「未對數」)',
+                                                    onConfirm: function () { unsettleDay(g.date); }
+                                                });
+                                            },
+                                            title: '解除對數',
+                                            className: 'text-[10px] font-semibold text-brand-orange tracking-wider px-2.5 py-1.5 ml-2 flex items-center gap-1 active:opacity-60'
+                                        }, IconUndo(13), '解除')
+                                    ),
+                                    dayOpen ? e('div', { className: 'px-3 pb-3 pt-1 bg-white border-t border-creamInput' },
+                                        e('div', { className: 'space-y-2 pt-2' },
+                                            g.items.map(function (it) {
+                                                var payerColor = it.payer === USER_1 ? 'text-brand-orange' : 'text-brand-blue';
+                                                var tagText = it.splitType === 'split' ? 'Shared'
+                                                    : it.splitType === 'forUser1' ? ('For ' + USER_1) : ('For ' + USER_2);
+                                                return e('div', { key: it.id, className: 'flex justify-between items-center bg-creamInput rounded-lg px-3 py-2' },
+                                                    e('div', { className: 'min-w-0 flex-1' },
+                                                        e('div', { className: 'font-semibold text-sm truncate' }, it.name),
+                                                        e('div', { className: 'text-[11px] text-brand-muted mt-0.5 font-medium' },
+                                                            e('span', { className: payerColor + ' font-semibold' }, it.payer),
+                                                            ' paid · ' + tagText,
+                                                            it.currency !== 'HKD' ? e('span', { className: 'ml-1' },
+                                                                ' · ' + it.currency + ' ' + it.price.toFixed(2)) : null
+                                                        )
+                                                    ),
+                                                    e('span', { className: 'font-display font-semibold text-sm display-num ml-2' }, '$' + hkdOf(it).toFixed(2))
+                                                );
+                                            })
+                                        )
+                                    ) : null
                                 );
                             })
                         ) : null
